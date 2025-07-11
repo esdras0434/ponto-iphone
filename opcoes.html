@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Opções de Ponto</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 20px 10px;
+      background: #f9f9f9;
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 400px;
+      width: 100%;
+      margin: auto;
+      background: white;
+      padding: 20px 15px;
+      border-radius: 8px;
+      box-shadow: 0 0 8px rgba(0,0,0,0.1);
+      text-align: center;
+      box-sizing: border-box;
+    }
+    #saudacao {
+      font-size: 1.5rem;
+      margin-bottom: 15px;
+      color: #333;
+      word-wrap: break-word;
+    }
+    .botoes-ponto {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      margin-top: 15px;
+    }
+    .botoes-ponto button {
+      padding: 15px 0;
+      font-size: 1.2rem;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      background-color: #4285f4;
+      color: white;
+      transition: background-color 0.3s;
+      user-select: none;
+      touch-action: manipulation;
+    }
+    .botoes-ponto button:hover,
+    .botoes-ponto button:focus {
+      background-color: #3367d6;
+      outline: none;
+    }
+    /* Popup */
+    .popup {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      padding: 20px 30px;
+      border-radius: 10px;
+      color: white;
+      font-weight: bold;
+      font-size: 1.2rem;
+      display: none;
+      z-index: 1000;
+      max-width: 90%;
+      text-align: center;
+      box-sizing: border-box;
+    }
+    .popup.sucesso {
+      background-color: #4caf50;
+    }
+    .popup.erro {
+      background-color: #f44336;
+    }
+
+    /* Responsividade para telas menores */
+    @media (max-width: 400px) {
+      #saudacao {
+        font-size: 1.2rem;
+      }
+      .botoes-ponto button {
+        font-size: 1rem;
+        padding: 13px 0;
+      }
+      .container {
+        padding: 15px 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div id="saudacao">Olá, ...</div>
+    <h2>Escolha o tipo de ponto</h2>
+    <div class="botoes-ponto">
+      <button onclick="escolherTipo('entrada_manha')">Entrada (Manhã)</button>
+      <button onclick="escolherTipo('saida_almoco')">Saída (Almoço)</button>
+      <button onclick="escolherTipo('retorno_almoco')">Retorno (Almoço)</button>
+      <button onclick="escolherTipo('saida_tarde')">Saída (Tarde)</button>
+    </div>
+  </div>
+
+  <!-- Popup -->
+  <div class="popup" id="popup"></div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import {
+      getFirestore,
+      collection,
+      query,
+      where,
+      getDocs
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCuCbBesvbrOvdzdv1cmCF7M2uaaUfWRU0",
+      authDomain: "meupontoapp-d5d3b.firebaseapp.com",
+      projectId: "meupontoapp-d5d3b",
+      storageBucket: "meupontoapp-d5d3b.appspot.com",
+      messagingSenderId: "700159340275",
+      appId: "1:700159340275:web:51094e94b4159521cf5186",
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    const popup = document.getElementById("popup");
+    const saudacaoEl = document.getElementById("saudacao");
+
+    async function carregarNome() {
+      const cpf = sessionStorage.getItem("cpf");
+      if (!cpf) {
+        window.location.href = "login.html";
+        return;
+      }
+
+      try {
+        const colRef = collection(db, "funcionarios");
+        const q = query(colRef, where("cpf", "==", cpf));
+        const snapshot = await getDocs(q);
+
+        if (snapshot.empty) {
+          saudacaoEl.textContent = "Olá, Funcionário";
+          return;
+        }
+
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          if (data.nome) {
+            saudacaoEl.textContent = `Olá, ${data.nome}`;
+          } else {
+            saudacaoEl.textContent = "Olá, Funcionário";
+          }
+        });
+      } catch (error) {
+        console.error("Erro ao buscar nome do funcionário:", error);
+        saudacaoEl.textContent = "Olá, Funcionário";
+      }
+    }
+
+    async function escolherTipo(tipo) {
+      const cpf = sessionStorage.getItem("cpf");
+      const hoje = new Date().toISOString().split("T")[0];
+
+      const colRef = collection(db, "pontos");
+      const q = query(colRef, where("cpf", "==", cpf), where("data", "==", hoje), where("tipo", "==", tipo));
+      const snapshot = await getDocs(q);
+
+      if (!snapshot.empty) {
+        mostrarPopup("Ponto já registrado para este horário!", false);
+        return;
+      }
+
+      sessionStorage.setItem("tipo", tipo);
+      window.location.href = "camera.html";
+    }
+
+    function mostrarPopup(msg, sucesso = true) {
+      popup.textContent = msg;
+      popup.className = `popup ${sucesso ? "sucesso" : "erro"}`;
+      popup.style.display = "block";
+      setTimeout(() => {
+        popup.style.display = "none";
+      }, 3000);
+    }
+
+    window.escolherTipo = escolherTipo;
+
+    carregarNome();
+  </script>
+</body>
+</html>

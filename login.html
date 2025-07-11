@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Login - Bater Ponto</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background-color: #f5f5f5;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      padding: 10px; /* espaçamento nas laterais em celulares */
+    }
+
+    .login-container {
+      background: white;
+      padding: 30px 20px;
+      border-radius: 12px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      text-align: center;
+      width: 300px;
+      max-width: 100%; /* para não ultrapassar largura da tela */
+      box-sizing: border-box;
+    }
+
+    .cpf-display {
+      font-size: 2rem;
+      margin: 20px auto;
+      width: 160px;
+      background: #fff;
+      padding: 10px;
+      border: 2px solid #000;
+      letter-spacing: 10px;
+      border-radius: 6px;
+      user-select: none;
+    }
+
+    .teclado {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .num-btn {
+      font-size: 1.5rem;
+      padding: 18px;
+      background: #d0e7ff;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.2s;
+      user-select: none;
+      touch-action: manipulation;
+    }
+
+    .num-btn:hover,
+    .num-btn:focus {
+      background: #b3dfff;
+      outline: none;
+    }
+
+    .limpar {
+      background-color: #f7caca;
+    }
+
+    .entrar {
+      grid-column: span 3;
+      background-color: #a1e8af;
+      font-weight: bold;
+    }
+
+    /* Responsividade para celular */
+    @media (max-width: 400px) {
+      .cpf-display {
+        font-size: 1.6rem;
+        width: 140px;
+        letter-spacing: 8px;
+        padding: 8px;
+      }
+
+      .num-btn {
+        font-size: 1.3rem;
+        padding: 15px;
+      }
+
+      .login-container {
+        padding: 20px 15px;
+      }
+
+      h2 {
+        font-size: 1.3rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <h2>Digite os 4 primeiros dígitos do CPF</h2>
+    <div class="cpf-display" id="cpfDisplay">____</div>
+
+    <div class="teclado">
+      <button class="num-btn" onclick="digitar(1)">1</button>
+      <button class="num-btn" onclick="digitar(2)">2</button>
+      <button class="num-btn" onclick="digitar(3)">3</button>
+      <button class="num-btn" onclick="digitar(4)">4</button>
+      <button class="num-btn" onclick="digitar(5)">5</button>
+      <button class="num-btn" onclick="digitar(6)">6</button>
+      <button class="num-btn" onclick="digitar(7)">7</button>
+      <button class="num-btn" onclick="digitar(8)">8</button>
+      <button class="num-btn" onclick="digitar(9)">9</button>
+      <button class="num-btn" onclick="digitar(0)">0</button>
+      <button class="num-btn limpar" onclick="limpar()">←</button>
+      <button class="num-btn entrar" onclick="entrar()">Entrar</button>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import {
+      getFirestore,
+      collection,
+      getDocs
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    // Configuração Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyCuCbBesvbrOvdzdv1cmCF7M2uaaUfWRU0",
+      authDomain: "meupontoapp-d5d3b.firebaseapp.com",
+      projectId: "meupontoapp-d5d3b",
+      storageBucket: "meupontoapp-d5d3b.appspot.com",
+      messagingSenderId: "700159340275",
+      appId: "1:700159340275:web:51094e94b4159521cf5186"
+    };
+
+    // Inicializa Firebase
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    let cpfParcial = "";
+
+    window.digitar = function(n) {
+      if (cpfParcial.length < 4) {
+        cpfParcial += n;
+        atualizarDisplay();
+      }
+    };
+
+    window.limpar = function() {
+      cpfParcial = cpfParcial.slice(0, -1);
+      atualizarDisplay();
+    };
+
+    function atualizarDisplay() {
+      const display = document.getElementById("cpfDisplay");
+      display.textContent = cpfParcial.padEnd(4, "_");
+    }
+
+    window.entrar = async function() {
+      if (cpfParcial.length !== 4) {
+        alert("Digite os 4 primeiros números do CPF.");
+        return;
+      }
+
+      try {
+        const colRef = collection(db, "funcionarios");
+        const snapshot = await getDocs(colRef);
+
+        let encontrado = null;
+
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          if (data.cpf && data.cpf.startsWith(cpfParcial)) {
+            encontrado = data.cpf;
+          }
+        });
+
+        if (!encontrado) {
+          alert("CPF não encontrado.");
+          return;
+        }
+
+        sessionStorage.setItem("cpf", encontrado);
+        window.location.href = "opcoes.html";
+      } catch (e) {
+        console.error("Erro ao buscar CPF:", e);
+        alert("Erro ao verificar CPF.");
+      }
+    };
+
+    atualizarDisplay(); // Inicializa display com ____
+  </script>
+</body>
+</html>

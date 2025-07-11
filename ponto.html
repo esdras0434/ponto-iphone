@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <title>Bater Ponto</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      background-color: #f0f8ff;
+    }
+
+    video {
+      width: 100%;
+      max-width: 360px;
+      border: 2px solid #333;
+      margin-bottom: 15px;
+    }
+
+    .loading {
+      display: none;
+      font-size: 1.2rem;
+      color: green;
+      margin: 15px 0;
+    }
+
+    button {
+      padding: 12px 20px;
+      font-size: 1rem;
+      margin: 10px;
+      cursor: pointer;
+      background-color: #007bff;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+  <h2>Bater Ponto</h2>
+  <video id="video" autoplay></video>
+  <canvas id="canvas" style="display: none;"></canvas>
+
+  <div>
+    <button onclick="baterPonto()">Bater Ponto</button>
+  </div>
+
+  <div class="loading" id="loading">Enviando ponto...</div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCuCbBesvbrOvdzdv1cmCF7M2uaaUfWRU0",
+      authDomain: "meupontoapp-d5d3b.firebaseapp.com",
+      projectId: "meupontoapp-d5d3b",
+      storageBucket: "meupontoapp-d5d3b.appspot.com",
+      messagingSenderId: "700159340275",
+      appId: "1:700159340275:web:51094e94b4159521cf5186"
+    };
+
+    const supabaseUrl = "https://hdchrttdbnnzxwnqhejp.supabase.co";
+    const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhkY2hydHRkYm5uenh3bnFoZWpwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE3MTkwMjQsImV4cCI6MjA2NzI5NTAyNH0.p9dBZborelgo3-49lDvjsulyYz32dOYRvejTFvzKw08";
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    const video = document.getElementById("video");
+    const canvas = document.getElementById("canvas");
+    const loading = document.getElementById("loading");
+
+    let stream;
+    let cpf;
+
+    // Pega CPF da URL
+    const params = new URLSearchParams(window.location.search);
+    cpf = params.get("cpf");
+
+    // Inicia câmera
+    async function startCamera() {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+        video.srcObject = stream;
+      } catch (e) {
+        alert("Erro ao acessar a câmera.");
+        console.error(e);
+      }
+    }
+
+    startCamera();
+
+    async function baterPonto() {
+      loading.style.display = "block";
+
+      // Captura a imagem
+      const ctx = canvas.getContext("2d");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0);
+
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/jpeg"));
+      const now = new Date();
+      const dataStr = now.toISOString().split("T")[0]; // yyyy-mm-dd
+      const hora = now.toTimeString().split(" ")[0];   // hh:mm:ss
+      const tipo = obterTipo(hora);
+      const fileName = `${cpf}_${tipo}_${dataStr}_${hora.replace(/:/g, "-")}.jpg`;
+
+      // Envia para Supabase
+      const form = new FormData();
+      form.append("file", blob, fileName);
+
+      const response = await fetch(`${supabaseUrl}/storage/v1/object/fotos-ponto/${cpf}/${fileName}`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${supabaseKey}`
+        },
+        body: blob
+      });
+
+      if (!response.ok) {
+        alert("Erro ao enviar foto.");
+        loading.style.display = "none";
+        return;
+      }
+
+      const fotoUrl = `${supabaseUrl}/storage/v1/object/public/fotos-ponto/${cpf}/${fileName}`;
+
+      // Salva no Firebase
+      await addDoc(collection(db, "pontos"), {
+        cpf,
+        data: dataStr,
+        hora,
+        tipo,
+        foto_url: fotoUrl
+      });
+
+      // Fecha câmera
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+
+      loading.style.display = "none";
+      alert("Ponto registrado com sucesso!");
+
+      // Redireciona para login
+      window.location.href = "index.html";
+    }
+
+    function obterTipo(hora) {
+      const [h, m] = hora.split(":").map(Number);
+      const totalMin = h * 60 + m;
+
+      if (totalMin < 660) return "entrada_manha";       // antes das 11:00
+      if (totalMin < 780) return "saida_almoco";        // antes das 13:00
+      if (totalMin < 1020) return "retorno_almoco";     // antes das 17:00
+      return "saida_tarde";
+    }
+  </script>
+</body>
+</html>

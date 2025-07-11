@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <title>Bater Ponto - Câmera</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      padding: 15px;
+      background-color: #f5f5f5;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 480px;
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      box-sizing: border-box;
+      text-align: center;
+    }
+
+    h2 {
+      margin-bottom: 20px;
+      font-size: 1.3rem;
+      color: #333;
+    }
+
+    video {
+      width: 100%;
+      height: auto;
+      border-radius: 10px;
+      margin-bottom: 15px;
+      background: #000;
+      object-fit: cover;
+    }
+
+    button {
+      width: 100%;
+      padding: 15px 0;
+      font-size: 1.2rem;
+      border: none;
+      border-radius: 8px;
+      background-color: #007bff;
+      color: white;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+      user-select: none;
+    }
+
+    button:hover:not(:disabled) {
+      background-color: #0056b3;
+    }
+
+    button:disabled {
+      background-color: #ccc !important;
+      cursor: not-allowed;
+      color: #666;
+      border: 1px solid #999;
+    }
+
+    #carregando {
+      display: none;
+      margin-top: 15px;
+      font-weight: bold;
+      color: #007bff;
+      font-size: 1rem;
+    }
+
+    /* Popup */
+    .popup {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      padding: 20px 30px;
+      border-radius: 10px;
+      color: white;
+      font-weight: bold;
+      font-size: 1.2rem;
+      display: none;
+      z-index: 1000;
+      max-width: 90%;
+      box-sizing: border-box;
+    }
+    .popup.sucesso {
+      background-color: #4caf50;
+    }
+    .popup.erro {
+      background-color: #f44336;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Posicione-se para bater o ponto</h2>
+    <video id="video" autoplay playsinline></video>
+    <button id="botaoBaterPonto" onclick="baterPonto()">Bater Ponto</button>
+    <p id="carregando">Enviando ponto...</p>
+  </div>
+
+  <!-- Popup de sucesso/erro -->
+  <div class="popup" id="popup"></div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import {
+      getFirestore,
+      collection,
+      addDoc
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCuCbBesvbrOvdzdv1cmCF7M2uaaUfWRU0",
+      authDomain: "meupontoapp-d5d3b.firebaseapp.com",
+      projectId: "meupontoapp-d5d3b",
+      storageBucket: "meupontoapp-d5d3b.appspot.com",
+      messagingSenderId: "700159340275",
+      appId: "1:700159340275:web:51094e94b4159521cf5186",
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    const supabaseUrl = "https://hdchrttdbnnzxwnqhejp.supabase.co";
+    const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhkY2hydHRkYm5uenh3bnFoZWpwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE3MTkwMjQsImV4cCI6MjA2NzI5NTAyNH0.p9dBZborelgo3-49lDvjsulyYz32dOYRvejTFvzKw08";
+
+    const video = document.getElementById('video');
+    const carregando = document.getElementById('carregando');
+    const popup = document.getElementById('popup');
+    const botao = document.getElementById('botaoBaterPonto');
+
+    // Ativa câmera frontal
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
+      .then(stream => {
+        video.srcObject = stream;
+      })
+      .catch(error => {
+        alert("Erro ao acessar a câmera: " + error.message);
+      });
+
+    async function baterPonto() {
+      botao.disabled = true;            // DESABILITA o botão
+      carregando.style.display = 'block';
+
+      const cpf = sessionStorage.getItem("cpf");
+      const tipo = sessionStorage.getItem("tipo") || "entrada_manha";
+
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/jpeg"));
+
+      const agora = new Date();
+      const data = agora.toISOString().split("T")[0];
+      const hora = agora.toTimeString().split(" ")[0];
+      const timestamp = agora.toLocaleTimeString("pt-BR").replace(/:/g, "-");
+
+      const nomeArquivo = `${cpf}_${tipo}_${data}_${timestamp}.jpg`;
+      const caminho = `imagens/${nomeArquivo}`;
+
+      try {
+        // Envia a foto para o Supabase
+        const { data: uploadData, error: uploadError } = await fetch(`${supabaseUrl}/storage/v1/object/${caminho}`, {
+          method: "POST",
+          headers: {
+            "apikey": supabaseAnonKey,
+            "Authorization": `Bearer ${supabaseAnonKey}`,
+            "Content-Type": "image/jpeg",
+          },
+          body: blob
+        }).then(r => r.json());
+
+        if (uploadError) throw new Error(uploadError.message);
+
+        const fotoUrl = `${supabaseUrl}/storage/v1/object/public/${caminho}`;
+
+        // Salva dados no Firestore
+        await addDoc(collection(db, "pontos"), {
+          cpf,
+          tipo,
+          data,
+          hora,
+          foto_url: fotoUrl
+        });
+
+        exibirPopup("Ponto registrado com sucesso!", true);
+      } catch (error) {
+        exibirPopup("Erro ao bater ponto: " + error.message, false);
+        botao.disabled = false;         // REABILITA botão em caso de erro
+        carregando.style.display = 'none';
+        return;
+      }
+
+      carregando.style.display = 'none';
+      setTimeout(() => {
+        window.location.href = "login.html";
+      }, 3000);
+    }
+
+    function exibirPopup(msg, sucesso = true) {
+      popup.textContent = msg;
+      popup.className = `popup ${sucesso ? "sucesso" : "erro"}`;
+      popup.style.display = "block";
+    }
+
+    window.baterPonto = baterPonto;
+  </script>
+</body>
+</html>
