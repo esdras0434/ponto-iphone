@@ -5,8 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Opções de Ponto</title>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
+
     body {
-      font-family: sans-serif;
+      font-family: 'Inter', sans-serif;
       padding: 20px 10px;
       background: #f9f9f9;
       margin: 0;
@@ -15,46 +17,59 @@
       align-items: center;
       min-height: 100vh;
     }
+
     .container {
       max-width: 400px;
       width: 100%;
       margin: auto;
-      background: white;
-      padding: 20px 15px;
-      border-radius: 8px;
-      box-shadow: 0 0 8px rgba(0,0,0,0.1);
       text-align: center;
-      box-sizing: border-box;
     }
+
     #saudacao {
       font-size: 1.5rem;
       margin-bottom: 15px;
       color: #333;
       word-wrap: break-word;
     }
-    .botoes-ponto {
+
+    .grid-botoes {
       display: grid;
-      grid-template-columns: 1fr;
+      grid-template-columns: repeat(2, 1fr);
       gap: 12px;
       margin-top: 15px;
     }
-    .botoes-ponto button {
-      padding: 15px 0;
+
+    .grid-botoes button {
+      padding: 40px 0;
       font-size: 1.2rem;
-      border-radius: 8px;
+      border-radius: 12px;
       border: none;
       cursor: pointer;
-      background-color: #4285f4;
       color: white;
-      transition: background-color 0.3s;
+      font-weight: 600;
+      transition: transform 0.2s, opacity 0.2s;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
       user-select: none;
       touch-action: manipulation;
     }
-    .botoes-ponto button:hover,
-    .botoes-ponto button:focus {
-      background-color: #3367d6;
-      outline: none;
+
+    .grid-botoes button:hover {
+      transform: translateY(-3px);
+      opacity: 0.95;
     }
+
+    .entrada { background-color: #4caf50; }   /* verde */
+    .pausa { background-color: #03a9f4; }     /* azul */
+    .retorno { background-color: #ffc107; }   /* amarelo */
+    .saida { background-color: #f44336; }     /* vermelho */
+
+    /* ícones simples via Unicode */
+    .icon { font-size: 1.8rem; }
+
     /* Popup */
     .popup {
       position: fixed;
@@ -72,25 +87,12 @@
       text-align: center;
       box-sizing: border-box;
     }
-    .popup.sucesso {
-      background-color: #4caf50;
-    }
-    .popup.erro {
-      background-color: #f44336;
-    }
+    .popup.sucesso { background-color: #4caf50; }
+    .popup.erro { background-color: #f44336; }
 
-    /* Responsividade para telas menores */
     @media (max-width: 400px) {
-      #saudacao {
-        font-size: 1.2rem;
-      }
-      .botoes-ponto button {
-        font-size: 1rem;
-        padding: 13px 0;
-      }
-      .container {
-        padding: 15px 12px;
-      }
+      #saudacao { font-size: 1.2rem; }
+      .grid-botoes button { font-size: 1rem; padding: 30px 0; }
     }
   </style>
 </head>
@@ -98,26 +100,31 @@
   <div class="container">
     <div id="saudacao">Olá, ...</div>
     <h2>Escolha o tipo de ponto</h2>
-    <div class="botoes-ponto">
-      <button onclick="escolherTipo('entrada_manha')">Entrada (Manhã)</button>
-      <button onclick="escolherTipo('saida_almoco')">Saída (Almoço)</button>
-      <button onclick="escolherTipo('retorno_almoco')">Retorno (Almoço)</button>
-      <button onclick="escolherTipo('saida_tarde')">Saída (Tarde)</button>
+    <div class="grid-botoes">
+      <button class="entrada" onclick="escolherTipo('entrada_manha')">
+        <div class="icon">🚪</div>
+        Entrada
+      </button>
+      <button class="pausa" onclick="escolherTipo('saida_almoco')">
+        <div class="icon">☕</div>
+        Pausa
+      </button>
+      <button class="retorno" onclick="escolherTipo('retorno_almoco')">
+        <div class="icon">☕</div>
+        Retorno
+      </button>
+      <button class="saida" onclick="escolherTipo('saida_tarde')">
+        <div class="icon">🚪</div>
+        Saída
+      </button>
     </div>
   </div>
 
-  <!-- Popup -->
   <div class="popup" id="popup"></div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import {
-      getFirestore,
-      collection,
-      query,
-      where,
-      getDocs
-    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyCuCbBesvbrOvdzdv1cmCF7M2uaaUfWRU0",
@@ -136,10 +143,7 @@
 
     async function carregarNome() {
       const cpf = sessionStorage.getItem("cpf");
-      if (!cpf) {
-        window.location.href = "login.html";
-        return;
-      }
+      if (!cpf) { window.location.href = "login.html"; return; }
 
       try {
         const colRef = collection(db, "funcionarios");
@@ -153,14 +157,10 @@
 
         snapshot.forEach(doc => {
           const data = doc.data();
-          if (data.nome) {
-            saudacaoEl.textContent = `Olá, ${data.nome}`;
-          } else {
-            saudacaoEl.textContent = "Olá, Funcionário";
-          }
+          saudacaoEl.textContent = data.nome ? `Olá, ${data.nome}` : "Olá, Funcionário";
         });
       } catch (error) {
-        console.error("Erro ao buscar nome do funcionário:", error);
+        console.error("Erro ao buscar nome:", error);
         saudacaoEl.textContent = "Olá, Funcionário";
       }
     }
@@ -174,7 +174,7 @@
       const snapshot = await getDocs(q);
 
       if (!snapshot.empty) {
-        mostrarPopup("Ponto já registrado para este horário!", false);
+        mostrarPopup("Ponto já registrado!", false);
         return;
       }
 
@@ -186,13 +186,10 @@
       popup.textContent = msg;
       popup.className = `popup ${sucesso ? "sucesso" : "erro"}`;
       popup.style.display = "block";
-      setTimeout(() => {
-        popup.style.display = "none";
-      }, 3000);
+      setTimeout(() => { popup.style.display = "none"; }, 3000);
     }
 
     window.escolherTipo = escolherTipo;
-
     carregarNome();
   </script>
 </body>
